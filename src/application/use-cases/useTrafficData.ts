@@ -2,9 +2,9 @@
 
 // src/application/use-cases/useTrafficData.ts
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import type { DashboardData, TrafficMetric, AlertStatus } from "@/domain/entities/TrafficMetric";
-import { trafficWebSocketService, FrameUpdateMessage } from "@/infrastructure/services/trafficWebSocketService";
+import { fetchDashboardData } from "@/infrastructure/services/trafficMockService";
 
 interface UseTrafficDataResult {
   data: DashboardData | null;
@@ -22,125 +22,65 @@ export function useTrafficData(streamId: string): UseTrafficDataResult {
   const [error, setError] = useState<string | null>(null);
   const [lastFetchedAt, setLastFetchedAt] = useState<Date | null>(null);
 
+  const loadData = useCallback(async () => {
+    try {
+      const mockData = await fetchDashboardData();
+      
+      // Add slight randomness to make it look "live"
+      const randomizedMetrics = mockData.metrics.map(m => {
+        if (typeof m.value === 'number') {
+           const variation = Math.floor(m.value * 0.05 * (Math.random() > 0.5 ? 1 : -1));
+           return { ...m, value: Math.max(0, m.value + variation) };
+        }
+        return m;
+      });
+
+      setData({
+        ...mockData,
+        metrics: randomizedMetrics,
+        lastUpdated: new Date().toISOString()
+      });
+      setLastFetchedAt(new Date());
+      setError(null);
+    } catch (err: any) {
+      setError(err.message || "Failed to fetch mock data");
+    } finally {
+      setIsLoading(false);
+    }
+  }, []);
+
   useEffect(() => {
     setIsLoading(true);
-    setError(null);
+    let isMounted = true;
+    let timer: NodeJS.Timeout;
 
-    // Initial connection
-    trafficWebSocketService.connect(streamId).catch(err => {
-      setError(err.message || "Failed to connect to stream");
-      setIsLoading(false);
-    });
-
-    const unsubscribe = trafficWebSocketService.subscribe((msg: FrameUpdateMessage) => {
-      setIsLoading(false);
-      setFrameBase64(msg.frame);
-      setLastFetchedAt(new Date(msg.timestamp));
+    async function initialLoad() {
+      if (!isMounted) return;
+      await loadData();
+      if (!isMounted) return;
       
-      const metrics: TrafficMetric[] = [
-        {
-          id: "metric-car",
-          label: "Mobil",
-          value: msg.counts.car,
-          unit: "vehicles",
-          iconName: "Car",
-          category: "vehicle",
-          status: "normal",
-          colorAccent: "#E879F9",
-        },
-        {
-          id: "metric-motor",
-          label: "Motor",
-          value: msg.counts.motorcycle,
-          unit: "vehicles",
-          iconName: "Bike",
-          category: "vehicle",
-          status: "normal",
-          colorAccent: "#E879F9",
-        },
-        {
-          id: "metric-truck",
-          label: "Truk",
-          value: msg.counts.truck,
-          unit: "vehicles",
-          iconName: "Truck",
-          category: "vehicle",
-          status: "normal",
-          colorAccent: "#A78BFA",
-        },
-        {
-          id: "metric-bus",
-          label: "Bus",
-          value: msg.counts.bus,
-          unit: "vehicles",
-          iconName: "Bus",
-          category: "vehicle",
-          status: "normal",
-          colorAccent: "#A78BFA",
-        },
-        {
-          id: "metric-person",
-          label: "Pejalan Kaki",
-          value: msg.counts.person,
-          unit: "people",
-          iconName: "User",
-          category: "person",
-          status: msg.counts.person > 50 ? "warning" : "normal",
-          colorAccent: "#F0ABFC",
-        },
-        {
-          id: "metric-density",
-          label: msg.density_status,
-          value: msg.person_vehicle_ratio.toFixed(2),
-          unit: "ratio",
-          iconName: "BarChart2",
-          category: "density",
-          status: msg.density_status.includes("High") ? "critical" : msg.density_status.includes("Medium") ? "warning" : "normal",
-          colorAccent: "#F97316",
-        }
-      ];
+      // Poll every 3 seconds to simulate live data
+      timer = setInterval(() => {
+        loadData();
+      }, 3000);
+    }
 
-      setData((prev) => {
-        let updatedAlerts = prev?.alerts || [];
-        if (msg.alert && msg.alert.triggered) {
-          const newAlert: AlertStatus = {
-            id: `alert-${Date.now()}`,
-            type: msg.alert.type.includes("Anomaly") ? "anomaly" : "high_density",
-            message: msg.alert.message,
-            severity: "critical",
-            timestamp: msg.timestamp,
-            isActive: true,
-            locationZone: `Stream ${streamId}`,
-          };
-          updatedAlerts = [newAlert, ...updatedAlerts].slice(0, 5);
-        }
-
-        return {
-          metrics,
-          alerts: updatedAlerts,
-          lastUpdated: msg.timestamp,
-          activeCamera: 1,
-          totalCameras: 1,
-          locationName: `Stream ${streamId}`,
-          coordinates: { lat: -6.2088, lng: 106.8456 },
-        };
-      });
-    });
+    initialLoad();
 
     return () => {
-      unsubscribe();
-      trafficWebSocketService.disconnect();
+      isMounted = false;
+      if (timer) clearInterval(timer);
     };
-  }, [streamId]);
+  }, [streamId, loadData]);
 
   return {
     data,
-    frameBase64,
+    frameBase64, // will be null for mock data, map background handles it
     isLoading,
     error,
     refetch: () => {
-      trafficWebSocketService.disconnect();
-      trafficWebSocketService.connect(streamId);
+      setIsLoading(true);
+      loadData();
     },
     lastFetchedAt,
   };

@@ -8,12 +8,26 @@ export function MapBackground({ frameBase64 }: { frameBase64?: string | null }) 
       <div className="absolute inset-0 bg-app-bg" />
 
       {/* Live Video Feed (if available) */}
-      {frameBase64 && (
+      {frameBase64 ? (
         <img 
           src={`data:image/jpeg;base64,${frameBase64}`} 
           alt="Live Stream Feed" 
           className="absolute inset-0 w-full h-full object-cover opacity-60 mix-blend-screen"
         />
+      ) : (
+        <div className="absolute inset-0 flex flex-col items-center justify-center opacity-40 mix-blend-screen pointer-events-none">
+          <div className="w-24 h-24 mb-4 rounded-full border border-dashed border-accent-primary flex items-center justify-center animate-[spin_10s_linear_infinite]">
+            <div className="w-16 h-16 rounded-full border border-accent-primary flex items-center justify-center animate-[spin_5s_linear_infinite_reverse]">
+              <div className="w-2 h-2 rounded-full bg-accent-primary animate-pulse" />
+            </div>
+          </div>
+          <h2 className="text-2xl font-bold tracking-[0.2em] text-accent-primary uppercase mb-2">
+            Camera Feed Area
+          </h2>
+          <p className="text-sm tracking-widest text-text-secondary uppercase">
+            Waiting for live stream or map data...
+          </p>
+        </div>
       )}
 
       {/* Grid overlay */}

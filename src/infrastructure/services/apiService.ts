@@ -2,7 +2,7 @@
 
 import { authService } from "./authService";
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL;
 
 async function fetchWithAuth(endpoint: string, options: RequestInit = {}) {
   const session = await authService.getSession();
@@ -12,6 +12,9 @@ async function fetchWithAuth(endpoint: string, options: RequestInit = {}) {
   if (token) {
     headers.set("Authorization", `Bearer ${token}`);
   }
+  
+  // Bypass ngrok browser warning screen
+  headers.set("ngrok-skip-browser-warning", "true");
   
   if (!headers.has("Content-Type") && !(options.body instanceof FormData)) {
     headers.set("Content-Type", "application/json");

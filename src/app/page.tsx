@@ -70,7 +70,7 @@ export default function Page() {
       )}
 
       {/* Layer 3: Floating panels */}
-      {data && (
+      {data && activeNav === "home" && (
         <div className="fixed right-4 top-20 bottom-4 z-40 flex flex-col gap-3 w-[340px] overflow-y-auto">
           {/* Stats grid */}
           <StatsPanel metrics={data.metrics} totalVehicles={totalVehicles} />
@@ -87,8 +87,23 @@ export default function Page() {
         </div>
       )}
 
+      {/* Dummy Placeholder for other views */}
+      {activeNav !== "home" && (
+        <div className="fixed right-4 top-20 bottom-4 z-40 flex flex-col gap-3 w-[340px]">
+          <div className="bg-black/60 backdrop-blur-md border border-white/10 rounded-2xl p-6 flex flex-col items-center justify-center flex-1 text-center">
+            <div className="w-16 h-16 rounded-full bg-accent-primary/10 border border-accent-primary/20 flex items-center justify-center mb-4">
+              <span className="text-accent-primary text-2xl font-bold capitalize">{activeNav.charAt(0)}</span>
+            </div>
+            <h2 className="text-xl font-bold text-text-primary mb-2 capitalize">{activeNav} Module</h2>
+            <p className="text-sm text-text-secondary leading-relaxed">
+              Tampilan untuk {activeNav} sedang dalam tahap pengembangan (dummy view).
+            </p>
+          </div>
+        </div>
+      )}
+
       {/* Scanning indicator — bottom left */}
-      {data && (
+      {data && activeNav === "home" && (
         <div className="fixed bottom-4 left-20 z-40">
           <div className="flex items-center gap-2 bg-black/60 backdrop-blur-md border border-white/10 rounded-xl px-3 py-2">
             <span className="flex items-center gap-1.5 text-xs text-text-secondary">

@@ -25,10 +25,12 @@ export type FrameUpdateMessage = {
 };
 
 type MessageHandler = (data: FrameUpdateMessage) => void;
+type StatusHandler = (status: 'connecting' | 'connected' | 'error') => void;
 
 class TrafficWebSocketService {
   private ws: WebSocket | null = null;
   private handlers: Set<MessageHandler> = new Set();
+  private statusHandlers: Set<StatusHandler> = new Set();
   private isConnecting = false;
   private reconnectTimer: NodeJS.Timeout | null = null;
   private streamId: string | null = null;
@@ -38,13 +40,14 @@ class TrafficWebSocketService {
     
     this.streamId = streamId;
     this.isConnecting = true;
+    this.statusHandlers.forEach(h => h('connecting'));
     
     try {
       const session = await authService.getSession();
       const token = session?.access_token;
       
-      const wsUrl = process.env.NEXT_PUBLIC_WS_API_URL || 'ws://localhost:8000';
-      this.ws = new WebSocket(`${wsUrl}/ws/live/${streamId}?token=${token}`);
+      const wsUrl = process.env.NEXT_PUBLIC_WS_API_URL ;
+      this.ws = new WebSocket(`${wsUrl}/ws/live/${streamId}?token=${token}&ngrok-skip-browser-warning=true`);
 
       this.ws.onmessage = (event) => {
         try {
@@ -59,22 +62,26 @@ class TrafficWebSocketService {
 
       this.ws.onclose = () => {
         this.isConnecting = false;
+        this.statusHandlers.forEach(h => h('error'));
         this.scheduleReconnect();
       };
 
       this.ws.onerror = (err) => {
         console.error("WebSocket error", err);
+        this.statusHandlers.forEach(h => h('error'));
         // Will trigger onclose
       };
 
       this.ws.onopen = () => {
         this.isConnecting = false;
+        this.statusHandlers.forEach(h => h('connected'));
         console.log("WebSocket connected for stream:", streamId);
         if (this.reconnectTimer) clearTimeout(this.reconnectTimer);
       };
 
     } catch (err) {
       this.isConnecting = false;
+      this.statusHandlers.forEach(h => h('error'));
       this.scheduleReconnect();
     }
   }
@@ -101,6 +108,13 @@ class TrafficWebSocketService {
     this.handlers.add(handler);
     return () => {
       this.handlers.delete(handler);
+    };
+  }
+
+  subscribeStatus(handler: StatusHandler) {
+    this.statusHandlers.add(handler);
+    return () => {
+      this.statusHandlers.delete(handler);
     };
   }
 }
